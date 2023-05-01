@@ -12,10 +12,10 @@ While it is ideal, the luxury of having full control over the application is not
 `dynamic-importmap` allows a module author to dynamically import code that contains bare import specifiers, rewriting those specifiers at runtime on the client side.
 
 This allows, for example, to publish a React component library to NPM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
-Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., Unpkg; in contrast to esm.sh which performs rewriting on the server side), without having full control over the importmaps on the page.
+Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
+A concrete use case is for an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
 
 ## Minimal example
-
 
 ```html
 <script type="module">
@@ -28,7 +28,7 @@ Using `dynamic-importmap`, this component library can be dynamically imported fr
 </script>
 ```
 
-Solution:
+### `dynamic-importmap` solution
 
 ```html
 <script type="module">
@@ -47,6 +47,16 @@ Solution:
   // It works!
 </script>
 ```
+
+### ESM-aware CDN solution
+
+An alternate solution is to use a CDN such as [esm.sh](https://esm.sh/) which can perform bare import specifier rewriting on the server side.
+However, this depends on a specialized CDN and prevents potentially hosting the scripts on a basic static web server or using a regular CDN as a fallback.
+
+### Pre-bundling solution
+
+Another solution would be to create a bundle for B which _contains_ a copy of A.
+However, this must be done ahead of time and published to NPM as a third package.
 
 ## React example
 
