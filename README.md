@@ -23,7 +23,7 @@ Using `dynamic-importmap`, this component library can be dynamically imported fr
   import { B_DependsOnA } from 'https://unpkg.com/some-b-with-bare-import-specifiers-for-a';
 
   // Uncaught TypeError:
-  // Failed to resolve module specifier "react".
+  // Failed to resolve module specifier "some-a".
   // Relative references must start with either "/", "./", or "../".
 </script>
 ```
