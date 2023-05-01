@@ -103,7 +103,7 @@ However, this usage of `es-module-shims` is not well documented, involves some u
 
 ### Take control over the full application 💪
 
-Not always possible (see [motivation](#motivation)), but potentially worth considering.
+See [motivation](#motivation).
 
 ### UMD solution
 
