@@ -28,6 +28,8 @@ A concrete use case is for an ES module that will run in a Jupyter notebook with
 </script>
 ```
 
+TODO: put dynamic solution last with warning.
+
 ### `dynamic-importmap` solution
 
 ```html
@@ -57,6 +59,23 @@ However, this depends on a specialized CDN and prevents potentially hosting the 
 
 Another solution would be to create a bundle for B which _contains_ a copy of A.
 However, this must be done ahead of time and published to NPM as a third package.
+
+### Pre-rewriting solution
+
+A different solution is to rewrite the bare module specifiers at build time (either in package B directly or in a new third package). However this locks you in to a particular CDN, which makes redundancy difficult and may have security implications.
+
+### es-module-shims solution
+
+es-module-shims can be used in shim-mode (rather than polyfill-mode) to achieve the same effect as dynamic-importmap.
+
+### Take control over the full application 💪
+
+Not always possible, but worth considering.
+
+### UMD solution
+
+Just kidding, it's 2023!
+
 
 ## React example
 
