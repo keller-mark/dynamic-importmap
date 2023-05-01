@@ -57,12 +57,14 @@ However, this depends on a specialized CDN and prevents potentially hosting the 
 ### Pre-bundling solution
 
 Another solution would be to create a bundle for `some-b` which _contains_ a copy of `some-a`.
-However, this must be done ahead of time and published to NPM as a third package.
+However, this must be done at build time and published to NPM as a third joint package.
+This also requires fixing the version of `some-a` that included at build time, and would prevent usage of a different version or variant of `some-a` (e.g., swapping out production and development variants).
 
 ### Pre-rewriting solution
 
-A different solution might be to rewrite the bare module specifiers at build time (potentially in some new package `some-b-with-full-import-specifiers-for-a`).
-However this locks you in to a particular CDN, which makes redundancy difficult and may have security implications.
+A different solution might be to rewrite the bare import specifiers into full specifiers at build time (potentially in some new package `some-b-with-full-import-specifiers-for-a`).
+However, this couples the package to a particular CDN, which makes redundancy difficult and may have security implications.
+Similar to the above pre-bundling solution, it also locks in the version/variant of `some-a` that is used (i.e., in the full specifier).
 
 ### es-module-shims solution
 
