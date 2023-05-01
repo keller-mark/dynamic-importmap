@@ -70,7 +70,7 @@ es-module-shims can be used in shim-mode (rather than polyfill-mode) to achieve 
 
 ### Take control over the full application 💪
 
-Not always possible, but worth considering.
+Not always possible (see [motivation](#motivation), but potentially worth considering.
 
 ### UMD solution
 
