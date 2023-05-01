@@ -74,7 +74,7 @@ Not always possible, but worth considering.
 
 ### UMD solution
 
-Just kidding! 
+Just kidding :laughing:
 
 
 ## React example
