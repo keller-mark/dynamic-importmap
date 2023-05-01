@@ -11,11 +11,7 @@
 While it is ideal, the luxury of having full control over the application is not always possible.
 `dynamic-importmap` allows a module author to dynamically import code that contains bare import specifiers, rewriting those specifiers at runtime on the client side.
 
-This allows, for example, to publish a React component library to NPM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
-Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
-A concrete use case is for an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
-
-## Minimal example
+### Problem
 
 ```html
 <script type="module">
@@ -28,12 +24,12 @@ A concrete use case is for an ES module that will run in a Jupyter notebook with
 </script>
 ```
 
-TODO: put dynamic solution last with warning.
-
-Note: dynamic-importmap is meant to be a last-resort solution (i.e., after considering the alternatives listed below).
-As noted by the WICG (above), import maps should ideally be defined at the application level with `<script type="importmap"/>` to ensure common modules can be shared.
+## Solutions
 
 ### `dynamic-importmap` solution
+
+Note that `dynamic-importmap` is meant to be a last resort (e.g., after considering the alternatives listed below).
+As noted by the WICG (quoted above), import maps should ideally be defined at the application level using `<script type="importmap"/>` to ensure that common modules can be shared.
 
 ```html
 <script type="module">
@@ -69,13 +65,44 @@ A different solution is to rewrite the bare module specifiers at build time (eit
 
 ### es-module-shims solution
 
-es-module-shims can be used in shim-mode (rather than polyfill-mode) to achieve the same effect as dynamic-importmap. However, this usage of es-module-shims is not well documented, involves some undesired use of side effects (i.e., global variables), and involves importing unused code (i.e., for the polyfill-mode).
+[es-module-shims](https://github.com/guybedford/es-module-shims) can be used in shim-mode (rather than polyfill-mode) to achieve the same result as `dynamic-importmap`.
 
-In contrast, this library makes use of many of the es-module-shims internals but does not include the extra polyfill features.
+<details>
+<summary>Toggle code</summary>
+
+```js
+window.esmsInitOptions = {
+  shimMode: true,
+  mapOverrides: true,
+};
+
+const script = Object.assign(document.createElement('script'), {
+  type: 'importmap-shim',
+  innerHTML: JSON.stringify({
+    imports: {
+      'some-a': 'https://unpkg.com/some-a',
+      'some-b-with-bare-import-specifiers-for-a': 'https://unpkg.com/some-b-with-bare-import-specifiers-for-a',
+    }
+  }),
+});
+
+document.body.appendChild(script);
+
+await import('https://ga.jspm.io/npm:es-module-shims@1.6.1/dist/es-module-shims.js');
+
+const { A } = await importShim('some-a');
+const { B_DependsOnA } = await importShim('some-b-with-bare-import-specifiers-for-a');
+```
+
+</details>
+
+However, this usage of es-module-shims is not well documented, involves some undesired use of side effects (i.e., global variables), and involves importing unused code (i.e., feature detection and error handling code necessary for its polyfill-mode).
+
+This library simply re-packages much of the es-module-shims internals into a straightforward one-function API that does not include the polyfill-related code.
 
 ### Take control over the full application 💪
 
-Not always possible (see [motivation](#motivation), but potentially worth considering.
+Not always possible (see [motivation](#motivation)), but potentially worth considering.
 
 ### UMD solution
 
@@ -83,6 +110,10 @@ Just kidding :laughing:
 
 
 ## React example
+
+A real-world use case is to publish a React component library to NPM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
+Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
+For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
 
 ```html
 <div id="root"></div>
@@ -118,9 +149,6 @@ Just kidding :laughing:
   root.render(React.createElement(MyApp));
 </script>
 ```
-
-
-
 
 ## References
 
