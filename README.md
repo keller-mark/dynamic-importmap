@@ -30,6 +30,9 @@ A concrete use case is for an ES module that will run in a Jupyter notebook with
 
 TODO: put dynamic solution last with warning.
 
+Note: dynamic-importmap is meant to be a last-resort solution (i.e., after considering the alternatives listed below).
+As noted by the WICG (above), import maps should ideally be defined at the application level with `<script type="importmap"/>` to ensure common modules can be shared.
+
 ### `dynamic-importmap` solution
 
 ```html
