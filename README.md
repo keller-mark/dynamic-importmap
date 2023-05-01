@@ -66,7 +66,9 @@ A different solution is to rewrite the bare module specifiers at build time (eit
 
 ### es-module-shims solution
 
-es-module-shims can be used in shim-mode (rather than polyfill-mode) to achieve the same effect as dynamic-importmap.
+es-module-shims can be used in shim-mode (rather than polyfill-mode) to achieve the same effect as dynamic-importmap. However, this usage of es-module-shims is not well documented, involves some undesired use of side effects (i.e., global variables), and involves importing unused code (i.e., for the polyfill-mode).
+
+In contrast, this library makes use of many of the es-module-shims internals but does not include the extra polyfill features.
 
 ### Take control over the full application 💪
 
