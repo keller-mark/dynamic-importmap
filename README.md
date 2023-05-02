@@ -1,5 +1,7 @@
 # dynamic-importmap
 
+![npm](https://img.shields.io/npm/v/dynamic-importmap)
+
 ## Motivation
 
 > Import maps are currently disallowed once any module loading has started, or once a single import map is loaded.
