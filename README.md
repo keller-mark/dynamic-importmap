@@ -11,11 +11,7 @@
 While it is ideal, the luxury of having full control over the application is not always possible.
 `dynamic-importmap` allows a module author to dynamically import code that contains bare import specifiers, rewriting those specifiers at runtime on the client side.
 
-This allows, for example, to publish a React component library to NPM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
-Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
-A concrete use case is for an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
-
-## Minimal example
+### Problem
 
 ```html
 <script type="module">
@@ -28,7 +24,12 @@ A concrete use case is for an ES module that will run in a Jupyter notebook with
 </script>
 ```
 
+## Solutions
+
 ### `dynamic-importmap` solution
+
+Note that `dynamic-importmap` is meant to be a last resort (e.g., after considering the alternatives listed below).
+As noted by the WICG (quoted above), import maps should ideally be defined at the application level using `<script type="importmap"/>` to ensure that common modules can be shared.
 
 ```html
 <script type="module">
@@ -51,14 +52,71 @@ A concrete use case is for an ES module that will run in a Jupyter notebook with
 ### ESM-aware CDN solution
 
 An alternate solution is to use a CDN such as [esm.sh](https://esm.sh/) which can perform bare import specifier rewriting on the server side.
-However, this depends on a specialized CDN and prevents potentially hosting the scripts on a basic static web server or using a regular CDN as a fallback.
+However, this depends on a specialized CDN and prevents potentially hosting the scripts on a static web server or using a regular CDN as a fallback.
 
 ### Pre-bundling solution
 
-Another solution would be to create a bundle for B which _contains_ a copy of A.
-However, this must be done ahead of time and published to NPM as a third package.
+Another solution would be to create a bundle for `some-b` which _contains_ a copy of `some-a`.
+However, this must be done at build time and published to NPM as a third joint package.
+This also requires fixing the version of `some-a` that is included at build time, and would prevent usage of a different version or variant (e.g., for production vs. development).
+
+### Pre-rewriting solution
+
+A different solution might be to rewrite the bare import specifiers into full specifiers at build time.
+However, this couples the package to a particular CDN, which makes redundancy difficult and may have security implications.
+Similar to the above pre-bundling solution, it also locks in the version/variant of `some-a` that is used (i.e., in the full specifier).
+
+### es-module-shims solution
+
+[es-module-shims](https://github.com/guybedford/es-module-shims) can be used in shim-mode (rather than polyfill-mode) to achieve the same result as `dynamic-importmap`.
+
+<details>
+<summary>Toggle code</summary>
+
+```js
+window.esmsInitOptions = {
+  shimMode: true,
+  mapOverrides: true,
+};
+
+const script = Object.assign(document.createElement('script'), {
+  type: 'importmap-shim',
+  innerHTML: JSON.stringify({
+    imports: {
+      'some-a': 'https://unpkg.com/some-a',
+      'some-b-with-bare-import-specifiers-for-a': 'https://unpkg.com/some-b-with-bare-import-specifiers-for-a',
+    }
+  }),
+});
+
+document.body.appendChild(script);
+
+await import('https://ga.jspm.io/npm:es-module-shims@1.6.1/dist/es-module-shims.js');
+
+const { A } = await importShim('some-a');
+const { B_DependsOnA } = await importShim('some-b-with-bare-import-specifiers-for-a');
+```
+
+</details>
+
+However, this usage of `es-module-shims` is not well documented, involves some undesired use of side-effects and global variables, and involves importing unused code (i.e., the feature detection and error handling code necessary for its polyfill-mode).
+
+`dynamic-importmap` simply re-packages much of the `es-module-shims` internals into a straightforward one-function API that does not include the polyfill-related code.
+
+### Take control over the full application 💪
+
+See [motivation](#motivation).
+
+### UMD solution
+
+Just kidding :laughing:
+
 
 ## React example
+
+A common practice is to publish a React component library to NPM as ESM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
+Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
+For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
 
 ```html
 <div id="root"></div>
@@ -94,9 +152,6 @@ However, this must be done ahead of time and published to NPM as a third package
   root.render(React.createElement(MyApp));
 </script>
 ```
-
-
-
 
 ## References
 
