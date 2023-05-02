@@ -57,7 +57,8 @@ As noted by the WICG (quoted above), import maps should ideally be defined at th
 ### ESM-aware CDN solution
 
 An alternate solution is to use a CDN such as [esm.sh](https://esm.sh/) which can perform bare import specifier rewriting on the server side.
-However, this depends on a specialized CDN and prevents potentially hosting the scripts on a static web server or using a regular CDN as a fallback.
+However, this depends on a specialized CDN (over which you have no control, of performance or otherwise) and prevents potentially hosting the scripts on a static web server or using a regular CDN as a fallback.
+
 
 ### Pre-bundling solution
 
