@@ -1,18 +1,23 @@
-import {
-  resolveAndComposeImportMap,
-  resolveUrl,
-  resolveImportMap,
-  resolveIfNotPlainOrUrl,
-  isURL,
-} from './resolve.js'
-import { dynamicImport, supportsDynamicImport } from './dynamic-import.js';
-import {
-  supportsImportMeta,
-  supportsImportMaps,
-  supportsCssAssertions,
-  supportsJsonAssertions,
-  featureDetectionPromise,
-} from './features.js';
+/**
+ * The code in this file was originally copied from
+ * https://github.com/guybedford/es-module-shims
+ * and adapted for the purposes described in the README.
+ * es-module-shims is licensed under the MIT license, which appears below:
+ * 
+ * Copyright (C) 2018-2021 Guy Bedford
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 import * as lexer from '../node_modules/es-module-lexer/dist/lexer.asm.js';
 
 const hasWindow = typeof window !== 'undefined';
@@ -25,8 +30,6 @@ const resolveHook = undefined;
 const importHook = undefined;
 const fetchHook = fetch;
 const metaHook = noop;
-// TODO(mark): remove
-// const mapOverrides = true;
 
 // TODO(mark): what is this used for?
 let nonce = undefined;
@@ -48,6 +51,172 @@ const cssModulesEnabled = enable.includes('css-modules');
 const jsonModulesEnabled = enable.includes('json-modules');
 const edge = !navigator.userAgentData && !!navigator.userAgent.match(/Edge\/\d+\.\d+/);
 
+const mapOverrides = true;
+
+let importMap = { imports: {}, scopes: {} };
+let baselinePassthrough = true;
+
+const backslashRegEx = /\\/g;
+
+function isURL (url) {
+  if (url.indexOf(':') === -1) return false;
+  try {
+    new URL(url);
+    return true;
+  }
+  catch (_) {
+    return false;
+  }
+}
+
+function resolveIfNotPlainOrUrl (relUrl, parentUrl) {
+  const hIdx = parentUrl.indexOf('#'), qIdx = parentUrl.indexOf('?');
+  if (hIdx + qIdx > -2)
+    parentUrl = parentUrl.slice(0, hIdx === -1 ? qIdx : qIdx === -1 || qIdx > hIdx ? hIdx : qIdx);
+  if (relUrl.indexOf('\\') !== -1)
+    relUrl = relUrl.replace(backslashRegEx, '/');
+  // protocol-relative
+  if (relUrl[0] === '/' && relUrl[1] === '/') {
+    return parentUrl.slice(0, parentUrl.indexOf(':') + 1) + relUrl;
+  }
+  // relative-url
+  else if (relUrl[0] === '.' && (relUrl[1] === '/' || relUrl[1] === '.' && (relUrl[2] === '/' || relUrl.length === 2 && (relUrl += '/')) ||
+      relUrl.length === 1  && (relUrl += '/')) ||
+      relUrl[0] === '/') {
+    const parentProtocol = parentUrl.slice(0, parentUrl.indexOf(':') + 1);
+    // Disabled, but these cases will give inconsistent results for deep backtracking
+    //if (parentUrl[parentProtocol.length] !== '/')
+    //  throw new Error('Cannot resolve');
+    // read pathname from parent URL
+    // pathname taken to be part after leading "/"
+    let pathname;
+    if (parentUrl[parentProtocol.length + 1] === '/') {
+      // resolving to a :// so we need to read out the auth and host
+      if (parentProtocol !== 'file:') {
+        pathname = parentUrl.slice(parentProtocol.length + 2);
+        pathname = pathname.slice(pathname.indexOf('/') + 1);
+      }
+      else {
+        pathname = parentUrl.slice(8);
+      }
+    }
+    else {
+      // resolving to :/ so pathname is the /... part
+      pathname = parentUrl.slice(parentProtocol.length + (parentUrl[parentProtocol.length] === '/'));
+    }
+
+    if (relUrl[0] === '/')
+      return parentUrl.slice(0, parentUrl.length - pathname.length - 1) + relUrl;
+
+    // join together and split for removal of .. and . segments
+    // looping the string instead of anything fancy for perf reasons
+    // '../../../../../z' resolved to 'x/y' is just 'z'
+    const segmented = pathname.slice(0, pathname.lastIndexOf('/') + 1) + relUrl;
+
+    const output = [];
+    let segmentIndex = -1;
+    for (let i = 0; i < segmented.length; i++) {
+      // busy reading a segment - only terminate on '/'
+      if (segmentIndex !== -1) {
+        if (segmented[i] === '/') {
+          output.push(segmented.slice(segmentIndex, i + 1));
+          segmentIndex = -1;
+        }
+        continue;
+      }
+      // new segment - check if it is relative
+      else if (segmented[i] === '.') {
+        // ../ segment
+        if (segmented[i + 1] === '.' && (segmented[i + 2] === '/' || i + 2 === segmented.length)) {
+          output.pop();
+          i += 2;
+          continue;
+        }
+        // ./ segment
+        else if (segmented[i + 1] === '/' || i + 1 === segmented.length) {
+          i += 1;
+          continue;
+        }
+      }
+      // it is the start of a new segment
+      while (segmented[i] === '/') i++;
+      segmentIndex = i; 
+    }
+    // finish reading out the last segment
+    if (segmentIndex !== -1)
+      output.push(segmented.slice(segmentIndex));
+    return parentUrl.slice(0, parentUrl.length - pathname.length) + output.join('');
+  }
+}
+
+function resolveUrl (relUrl, parentUrl) {
+  return resolveIfNotPlainOrUrl(relUrl, parentUrl) || (isURL(relUrl) ? relUrl : resolveIfNotPlainOrUrl('./' + relUrl, parentUrl));
+}
+
+function getMatch (path, matchObj) {
+  if (matchObj[path])
+    return path;
+  let sepIndex = path.length;
+  do {
+    const segment = path.slice(0, sepIndex + 1);
+    if (segment in matchObj)
+      return segment;
+  } while ((sepIndex = path.lastIndexOf('/', sepIndex - 1)) !== -1)
+}
+
+function applyPackages (id, packages) {
+  const pkgName = getMatch(id, packages);
+  if (pkgName) {
+    const pkg = packages[pkgName];
+    if (pkg === null) return;
+    return pkg + id.slice(pkgName.length);
+  }
+}
+
+function resolveImportMap (importMap, resolvedOrPlain, parentUrl) {
+  let scopeUrl = parentUrl && getMatch(parentUrl, importMap.scopes);
+  while (scopeUrl) {
+    const packageResolution = applyPackages(resolvedOrPlain, importMap.scopes[scopeUrl]);
+    if (packageResolution)
+      return packageResolution;
+    scopeUrl = getMatch(scopeUrl.slice(0, scopeUrl.lastIndexOf('/')), importMap.scopes);
+  }
+  return applyPackages(resolvedOrPlain, importMap.imports) || resolvedOrPlain.indexOf(':') !== -1 && resolvedOrPlain;
+}
+
+function resolveAndComposePackages (packages, outPackages, baseUrl, parentMap) {
+  for (let p in packages) {
+    const resolvedLhs = resolveIfNotPlainOrUrl(p, baseUrl) || p;
+    if ((!shimMode || !mapOverrides) && outPackages[resolvedLhs] && (outPackages[resolvedLhs] !== packages[resolvedLhs])) {
+      throw Error(`Rejected map override "${resolvedLhs}" from ${outPackages[resolvedLhs]} to ${packages[resolvedLhs]}.`);
+    }
+    let target = packages[p];
+    if (typeof target !== 'string')
+      continue;
+    const mapped = resolveImportMap(parentMap, resolveIfNotPlainOrUrl(target, baseUrl) || target, baseUrl);
+    if (mapped) {
+      outPackages[resolvedLhs] = mapped;
+      continue;
+    }
+    console.warn(`Mapping "${p}" -> "${packages[p]}" does not resolve`);
+  }
+}
+
+function resolveAndComposeImportMap (json, baseUrl, parentMap) {
+  const outMap = { imports: Object.assign({}, parentMap.imports), scopes: Object.assign({}, parentMap.scopes) };
+
+  if (json.imports)
+    resolveAndComposePackages(json.imports, outMap.imports, baseUrl, parentMap, null);
+
+  if (json.scopes)
+    for (let s in json.scopes) {
+      const resolvedScope = resolveUrl(s, baseUrl);
+      resolveAndComposePackages(json.scopes[s], outMap.scopes[resolvedScope] || (outMap.scopes[resolvedScope] = {}), baseUrl, parentMap);
+    }
+
+  return outMap;
+}
+
 // TODO(mark): what is this used for?
 const baseUrl = hasDocument
   ? document.baseURI
@@ -58,7 +227,55 @@ const pageBaseUrl = baseUrl;
 
 const createBlob = (source, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
 
-let skip = undefined;
+let dynamicImport = !hasDocument && (0, eval)('u=>import(u)');
+
+let supportsDynamicImport;
+
+const dynamicImportCheck = hasDocument && new Promise(resolve => {
+  const s = Object.assign(document.createElement('script'), {
+    src: createBlob('self._d=u=>import(u)'),
+    ep: true
+  });
+  s.setAttribute('nonce', nonce);
+  s.addEventListener('load', () => {
+    if (!(supportsDynamicImport = !!(dynamicImport = self._d))) {
+      let err;
+      window.addEventListener('error', _err => err = _err);
+      dynamicImport = (url, opts) => new Promise((resolve, reject) => {
+        const s = Object.assign(document.createElement('script'), {
+          type: 'module',
+          src: createBlob(`import*as m from'${url}';self._esmsi=m`)
+        });
+        err = undefined;
+        s.ep = true;
+        if (nonce)
+          s.setAttribute('nonce', nonce);
+        // Safari is unique in supporting module script error events
+        s.addEventListener('error', cb);
+        s.addEventListener('load', cb);
+        function cb (_err) {
+          document.head.removeChild(s);
+          if (self._esmsi) {
+            resolve(self._esmsi, baseUrl);
+            self._esmsi = undefined;
+          }
+          else {
+            reject(!(_err instanceof Event) && _err || err && err.error || new Error(`Error loading ${opts && opts.errUrl || url} (${s.src}).`));
+            err = undefined;
+          }
+        }
+        document.head.appendChild(s);
+      });
+    }
+    document.head.removeChild(s);
+    delete self._d;
+    resolve();
+  });
+  document.head.appendChild(s);
+});
+
+
+const skip = undefined;
 
 // TODO: try to remove
 const throwError = err => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
@@ -67,26 +284,99 @@ function fromParent (parent) {
   return parent ? ` imported from ${parent}` : '';
 }
 
+// support browsers without dynamic import support (eg Firefox 6x)
+let supportsJsonAssertions = false;
+let supportsCssAssertions = false;
+
+const supports = hasDocument && HTMLScriptElement.supports;
+
+let supportsImportMaps = supports && supports.name === 'supports' && supports('importmap');
+let supportsImportMeta = supportsDynamicImport;
+
+const importMetaCheck = 'import.meta';
+const cssModulesCheck = `import"x"assert{type:"css"}`;
+const jsonModulesCheck = `import"x"assert{type:"json"}`;
+
+let featureDetectionPromise = Promise.resolve(dynamicImportCheck).then(() => {
+  if (!supportsDynamicImport)
+    return;
+
+  if (!hasDocument)
+    return Promise.all([
+      supportsImportMaps || dynamicImport(createBlob(importMetaCheck)).then(() => supportsImportMeta = true, noop),
+      cssModulesEnabled && dynamicImport(createBlob(cssModulesCheck.replace('x', createBlob('', 'text/css')))).then(() => supportsCssAssertions = true, noop),
+      jsonModulesEnabled && dynamicImport(createBlob(jsonModulescheck.replace('x', createBlob('{}', 'text/json')))).then(() => supportsJsonAssertions = true, noop),
+    ]);
+
+  return new Promise(resolve => {
+    if (self.ESMS_DEBUG) console.info(`es-module-shims: performing feature detections for ${`${supportsImportMaps ? '' : 'import maps, '}${cssModulesEnabled ? 'css modules, ' : ''}${jsonModulesEnabled ? 'json modules, ' : ''}`.slice(0, -2)}`);
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.setAttribute('nonce', nonce);
+    function cb ({ data }) {
+      const isFeatureDetectionMessage = Array.isArray(data) && data[0] === 'esms'
+      if (!isFeatureDetectionMessage) {
+        return;
+      }
+      supportsImportMaps = data[1];
+      supportsImportMeta = data[2];
+      supportsCssAssertions = data[3];
+      supportsJsonAssertions = data[4];
+      resolve();
+      document.head.removeChild(iframe);
+      window.removeEventListener('message', cb, false);
+    }
+    window.addEventListener('message', cb, false);
+
+    const importMapTest = `<script nonce=${nonce || ''}>b=(s,type='text/javascript')=>URL.createObjectURL(new Blob([s],{type}));document.head.appendChild(Object.assign(document.createElement('script'),{type:'importmap',nonce:"${nonce}",innerText:\`{"imports":{"x":"\${b('')}"}}\`}));Promise.all([${
+      supportsImportMaps ? 'true,true' : `'x',b('${importMetaCheck}')`}, ${cssModulesEnabled ? `b('${cssModulesCheck}'.replace('x',b('','text/css')))` : 'false'}, ${
+      jsonModulesEnabled ? `b('${jsonModulesCheck}'.replace('x',b('{}','text/json')))` : 'false'}].map(x =>typeof x==='string'?import(x).then(x =>!!x,()=>false):x)).then(a=>parent.postMessage(['esms'].concat(a),'*'))<${''}/script>`;
+
+    // Safari will call onload eagerly on head injection, but we don't want the Wechat
+    // path to trigger before setting srcdoc, therefore we track the timing
+    let readyForOnload = false, onloadCalledWhileNotReady = false;
+    function doOnload () {
+      if (!readyForOnload) {
+        onloadCalledWhileNotReady = true;
+        return;
+      }
+      // WeChat browser doesn't support setting srcdoc scripts
+      // But iframe sandboxes don't support contentDocument so we do this as a fallback
+      const doc = iframe.contentDocument;
+      if (doc && doc.head.childNodes.length === 0) {
+        const s = doc.createElement('script');
+        if (nonce)
+          s.setAttribute('nonce', nonce);
+        s.innerHTML = importMapTest.slice(15 + (nonce ? nonce.length : 0), -9);
+        doc.head.appendChild(s);
+      }
+    }
+
+    iframe.onload = doOnload;
+    // WeChat browser requires append before setting srcdoc
+    document.head.appendChild(iframe);
+
+    // setting srcdoc is not supported in React native webviews on iOS
+    // setting src to a blob URL results in a navigation event in webviews
+    // document.write gives usability warnings
+    readyForOnload = true;
+    if ('srcdoc' in iframe)
+      iframe.srcdoc = importMapTest;
+    else
+      iframe.contentDocument.write(importMapTest);
+    // retrigger onload for Safari only if necessary
+    if (onloadCalledWhileNotReady) doOnload();
+  });
+});
+
+/*
+if (self.ESMS_DEBUG)
+  featureDetectionPromise = featureDetectionPromise.then(() => {
+    console.info(`es-module-shims: detected native support - ${supportsDynamicImport ? '' : 'no '}dynamic import, ${supportsImportMeta ? '' : 'no '}import meta, ${supportsImportMaps ? '' : 'no '}import maps`);
+  });
+*/
 
 const importMapSrcOrLazy = false;
-function setImportMapSrcOrLazy () {
-  // TODO(mark): can this be a no-op?
-  // importMapSrcOrLazy = true;
-}
-
-
-
-
-
-const esmsInitOptions = {
-  shimMode: true,
-  mapOverrides: true,
-  onimport: undefined,
-  resolve: undefined,
-  fetch: fetch,
-  meta: noop,
-  onerror: noop,
-};
 
 async function _resolve (id, parentUrl) {
   const urlResolved = resolveIfNotPlainOrUrl(id, parentUrl);
@@ -109,7 +399,7 @@ const resolve = resolveHook ? async (id, parentUrl) => {
 // importShim('mod', { opts });
 // importShim('mod', { opts }, parentUrl);
 // importShim('mod', parentUrl);
-export async function importShim (id, ...args) {
+async function importShim (id, ...args) {
   // parentUrl if present will be the last argument
   let parentUrl = args[args.length - 1];
   if (typeof parentUrl !== 'string')
@@ -117,21 +407,8 @@ export async function importShim (id, ...args) {
   // needed for shim check
   await initPromise;
   if (importHook) await importHook(id, typeof args[1] !== 'string' ? args[1] : {}, parentUrl);
-  /*
-  TODO(mark): remove
-  if (acceptingImportMaps || shimMode || !baselinePassthrough) {
-    if (hasDocument)
-      processScriptsAndPreloads(true);
-    if (!shimMode)
-      acceptingImportMaps = false;
-    
-  }
-  */
-  await importMapPromise;
   return topLevelLoad((await resolve(id, parentUrl)).r, { credentials: 'same-origin' });
 }
-
-// self.importShim = importShim;
 
 function defaultResolve (id, parentUrl) {
   return resolveImportMap(importMap, resolveIfNotPlainOrUrl(id, parentUrl) || id, parentUrl) || throwUnresolved(id, parentUrl);
@@ -151,21 +428,6 @@ function metaResolve (id, parentUrl = this.url) {
   return resolveSync(id, parentUrl);
 }
 
-
-// importShim.resolve = resolveSync;
-export function getImportMap() {
-  return JSON.parse(JSON.stringify(importMap));
-}
-export function addImportMap(importMapIn) {
-  if (!shimMode) throw new Error('Unsupported in polyfill mode.');
-  importMap = resolveAndComposeImportMap(importMapIn, pageBaseUrl, importMap);
-}
-
-export async function importWithMap(id, importMapIn) {
-  addImportMap(importMapIn);
-  return importShim(id);
-}
-
 const registry = importShim._r = {};
 
 async function loadAll (load, seen) {
@@ -178,65 +440,21 @@ async function loadAll (load, seen) {
     load.n = load.d.some(dep => dep.n);
 }
 
-let importMap = { imports: {}, scopes: {} };
-let baselinePassthrough = true;
-
 const initPromise = featureDetectionPromise.then(() => {
-  baselinePassthrough = esmsInitOptions.polyfillEnable !== true && supportsDynamicImport && supportsImportMeta && supportsImportMaps && (!jsonModulesEnabled || supportsJsonAssertions) && (!cssModulesEnabled || supportsCssAssertions) && !importMapSrcOrLazy;
+  baselinePassthrough = supportsDynamicImport && supportsImportMeta && supportsImportMaps && (!jsonModulesEnabled || supportsJsonAssertions) && (!cssModulesEnabled || supportsCssAssertions) && !importMapSrcOrLazy;
   if (self.ESMS_DEBUG) console.info(`es-module-shims: init ${shimMode ? 'shim mode' : 'polyfill mode'}, ${baselinePassthrough ? 'baseline passthrough' : 'polyfill engaged'}`);
   if (hasDocument) {
     if (!supportsImportMaps) {
       const supports = HTMLScriptElement.supports || (type => type === 'classic' || type === 'module');
       HTMLScriptElement.supports = type => type === 'importmap' || supports(type);
     }
-    /*
-    TODO(mark): remove
-    if (shimMode || !baselinePassthrough) {
-      new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-          if (mutation.type !== 'childList') continue;
-          for (const node of mutation.addedNodes) {
-            if (node.tagName === 'SCRIPT') {
-              if (node.type === (shimMode ? 'module-shim' : 'module'))
-                processScript(node, true);
-              if (node.type === (shimMode ? 'importmap-shim' : 'importmap'))
-                processImportMap(node, true);
-            }
-            else if (node.tagName === 'LINK' && node.rel === (shimMode ? 'modulepreload-shim' : 'modulepreload')) {
-              processPreload(node);
-            }
-          }
-        }
-      }).observe(document, {childList: true, subtree: true});
-      processScriptsAndPreloads();
-      if (document.readyState === 'complete') {
-        readyStateCompleteCheck();
-      }
-      else {
-        async function readyListener() {
-          await initPromise;
-          processScriptsAndPreloads();
-          if (document.readyState === 'complete') {
-            readyStateCompleteCheck();
-            document.removeEventListener('readystatechange', readyListener);
-          }
-        }
-        document.addEventListener('readystatechange', readyListener);
-      }
-    }
-    */
   }
   return lexer.init;
 });
-let importMapPromise = initPromise;
 let firstPolyfillLoad = true;
-// TODO(mark): remove
-//let acceptingImportMaps = true;
 
-async function topLevelLoad (url, fetchOpts, source, nativelyLoaded, lastStaticLoadPromise) {
+async function topLevelLoad(url, fetchOpts, source, nativelyLoaded, lastStaticLoadPromise) {
   await initPromise;
-  // TODO(mark): remove
-  // await importMapPromise;
   if (importHook) await importHook(url, typeof fetchOpts !== 'string' ? fetchOpts : {}, '');
   // early analysis opt-out - no need to even fetch if we have feature support
   if (!shimMode && baselinePassthrough) {
@@ -529,38 +747,6 @@ function getOrCreateLoad (url, fetchOpts, parent, source) {
   return load;
 }
 
-/*
-TODO(mark): remove
-function processScriptsAndPreloads (mapsOnly = false) {
-  if (self.ESMS_DEBUG) console.info(`es-module-shims: processing scripts`);
-  if (!mapsOnly)
-    for (const link of document.querySelectorAll(shimMode ? 'link[rel=modulepreload-shim]' : 'link[rel=modulepreload]'))
-      processPreload(link);
-  for (const script of document.querySelectorAll(shimMode ? 'script[type=importmap-shim]' : 'script[type=importmap]'))
-    processImportMap(script);
-  if (!mapsOnly)
-    for (const script of document.querySelectorAll(shimMode ? 'script[type=module-shim]' : 'script[type=module]'))
-      processScript(script);
-}
-*/
-
-function getFetchOpts (script) {
-  const fetchOpts = {};
-  if (script.integrity)
-    fetchOpts.integrity = script.integrity;
-  if (script.referrerPolicy)
-    fetchOpts.referrerPolicy = script.referrerPolicy;
-  if (script.crossOrigin === 'use-credentials')
-    fetchOpts.credentials = 'include';
-  else if (script.crossOrigin === 'anonymous')
-    fetchOpts.credentials = 'omit';
-  else
-    fetchOpts.credentials = 'same-origin';
-  return fetchOpts;
-}
-
-let lastStaticLoadPromise = Promise.resolve();
-
 let domContentLoadedCnt = 1;
 function domContentLoadedCheck () {
   if (--domContentLoadedCnt === 0 && !noLoadEventRetriggers && (shimMode || !baselinePassthrough)) {
@@ -576,78 +762,18 @@ if (hasDocument) {
   });
 }
 
-let readyStateCompleteCnt = 1;
-function readyStateCompleteCheck () {
-  if (--readyStateCompleteCnt === 0 && !noLoadEventRetriggers && (shimMode || !baselinePassthrough)) {
-    if (self.ESMS_DEBUG) console.info(`es-module-shims: readystatechange complete refire`);
-    document.dispatchEvent(new Event('readystatechange'));
-  }
-}
-
 const hasNext = script => script.nextSibling || script.parentNode && hasNext(script.parentNode);
-const epCheck = (script, ready) => script.ep || !ready && (!script.src && !script.innerHTML || !hasNext(script)) || script.getAttribute('noshim') !== null || !(script.ep = true);
-
-/*
-TODO: remove
-function processImportMap (script, ready = readyStateCompleteCnt > 0) {
-  if (epCheck(script, ready)) return;
-  // we dont currently support multiple, external or dynamic imports maps in polyfill mode to match native
-  if (script.src) {
-    if (!shimMode)
-      return;
-    setImportMapSrcOrLazy();
-  }
-  if (acceptingImportMaps) {
-    importMapPromise = importMapPromise
-      .then(async () => {
-        importMap = resolveAndComposeImportMap(script.src ? await (await doFetch(script.src, getFetchOpts(script))).json() : JSON.parse(script.innerHTML), script.src || pageBaseUrl, importMap);
-      })
-      .catch(e => {
-        console.log(e);
-        if (e instanceof SyntaxError)
-          e = new Error(`Unable to parse import map ${e.message} in: ${script.src || script.innerHTML}`);
-        throwError(e);
-      });
-    if (!shimMode)
-      acceptingImportMaps = false;
-  }
-}
-*/
-
-/*
-function processScript (script, ready = readyStateCompleteCnt > 0) {
-  if (epCheck(script, ready)) return;
-  // does this load block readystate complete
-  const isBlockingReadyScript = script.getAttribute('async') === null && readyStateCompleteCnt > 0;
-  // does this load block DOMContentLoaded
-  const isDomContentLoadedScript = domContentLoadedCnt > 0;
-  if (isBlockingReadyScript) readyStateCompleteCnt++;
-  if (isDomContentLoadedScript) domContentLoadedCnt++;
-  if (self.ESMS_DEBUG) console.info(`es-module-shims: processing ${script.src || '<inline>'}`);
-  const loadPromise = topLevelLoad(script.src || pageBaseUrl, getFetchOpts(script), !script.src && script.innerHTML, !shimMode, isBlockingReadyScript && lastStaticLoadPromise)
-    .then(() => {
-      // if the type of the script tag "module-shim", browser does not dispatch a "load" event
-      // see https://github.com/guybedford/es-module-shims/issues/346
-      if (shimMode) {
-        if (self.ESMS_DEBUG) console.info(`es-module-shims: load even refire ${script.src || '<inline>'}`);
-        script.dispatchEvent(new Event('load'));
-      }
-    })
-    .catch(throwError);
-  if (isBlockingReadyScript)
-    lastStaticLoadPromise = loadPromise.then(readyStateCompleteCheck);
-  if (isDomContentLoadedScript)
-    loadPromise.then(domContentLoadedCheck);
-}
-*/
 
 const fetchCache = {};
-/*
-function processPreload (link) {
-  if (link.ep) return;
-  link.ep = true;
-  if (fetchCache[link.href])
-    return;
-  fetchCache[link.href] = fetchModule(link.href, getFetchOpts(link));
+
+export function getImportMap() {
+  return JSON.parse(JSON.stringify(importMap));
 }
-*/
+export function addImportMap(importMapIn) {
+  importMap = resolveAndComposeImportMap(importMapIn, pageBaseUrl, importMap);
+}
+
+export async function importWithMap(id, importMapIn) {
+  addImportMap(importMapIn);
+  return importShim(id);
+}

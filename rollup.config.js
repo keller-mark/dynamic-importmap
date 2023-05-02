@@ -11,10 +11,8 @@ export default [
 ];
 
 function config (isWasm, isDebug) {
-  const name = 'es-module-shims'
-
   return {
-    input: `src/${name}.js`,
+    input: `src/index.js`,
     output: {
       file: `dist/index${isWasm ? '.wasm' : ''}${isDebug ? '.debug' : ''}.js`,
       format: "esm",
