@@ -58,7 +58,7 @@ However, this depends on a specialized CDN and prevents potentially hosting the 
 
 Another solution would be to create a bundle for `some-b` which _contains_ a copy of `some-a`.
 However, this must be done at build time and published to NPM as a third joint package.
-This also requires fixing the version of `some-a` that included at build time, and would prevent usage of a different version or variant of `some-a` (e.g., swapping out production and development variants).
+This also requires fixing the version of `some-a` that included at build time, and would prevent usage of a different version or variant (e.g., for production vs. development).
 
 ### Pre-rewriting solution
 
