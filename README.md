@@ -8,6 +8,11 @@
 > -- [WICG/import-maps](https://github.com/WICG/import-maps#scope) (emphasis mine)
 
 
+> Import maps are currently disallowed once any module loading has started, or once a single import map is loaded.
+> These restrictions might be lifted in future specification revisions.
+> -- [WHATWG](https://html.spec.whatwg.org/multipage/webappapis.html#import-maps)
+
+
 While it is ideal, the luxury of having full control over the application is not always possible.
 `dynamic-importmap` allows a module author to dynamically import code that contains bare import specifiers, rewriting those specifiers at runtime on the client side.
 
