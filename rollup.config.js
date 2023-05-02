@@ -1,6 +1,6 @@
 import fs from 'fs';
-import replace from '@rollup/plugin-replace';
 import path from 'path';
+import replace from '@rollup/plugin-replace';
 
 const version = JSON.parse(fs.readFileSync('package.json')).version;
 
@@ -16,9 +16,8 @@ function config (isWasm, isDebug) {
   return {
     input: `src/${name}.js`,
     output: {
-      file: `dist/${name}${isWasm ? '.wasm' : ''}${isDebug ? '.debug' : ''}.js`,
-      format: 'iife',
-      strict: false,
+      file: `dist/index${isWasm ? '.wasm' : ''}${isDebug ? '.debug' : ''}.js`,
+      format: "esm",
       sourcemap: false,
       banner: `/* ES Module Shims ${isWasm ? 'Wasm ' : ''}${isDebug ? 'DEBUG BUILD ' : ''}${version} */`
     },

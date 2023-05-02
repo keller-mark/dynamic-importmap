@@ -1,22 +1,32 @@
 {
   "name": "dynamic-importmap",
   "version": "0.0.1",
-  "description": "Dynamically rewrite bare module specifiers at runtime",
-  "main": "dist/es-module-shims.js",
-  "exports": {
-    ".": "./dist/es-module-shims.js",
-    "./debug": "./dist/es-module-shims.debug.js",
-    "./wasm": "./dist/es-module-shims.wasm.js"
-  },
-  "types": "index.d.ts",
-  "type": "module",
-  "files": [
-    "CHANGELOG.md",
-    "dist",
-    "index.d.ts"
-  ],
-  "author": "Mark Keller",
   "license": "MIT",
+  "author": "Mark Keller",
+  "homepage": "https://github.com/keller-mark/dynamic-importmap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keller-mark/dynamic-importmap.git"
+  },
+  "description": "Dynamically rewrite bare module specifiers at runtime",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./debug": "./dist/index.debug.js",
+    "./wasm": "./dist/index.wasm.js"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "rimraf ./dist/ && pnpm run build-lib",
+    "build-lib": "rollup --config rollup.config.js",
+    "start-html": "http-server --cors='*' --port 3004 ./",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
+  },
   "devDependencies": {
     "@rollup/plugin-replace": "^2.4.2",
     "es-module-lexer": "1.2.1",
@@ -31,24 +41,8 @@
     "rimraf": "^3.0.2",
     "rollup": "^2.58.0",
     "tachometer": "^0.5.10",
-    "terser": "^5.10.0"
-  },
-  "directories": {
-    "test": "test"
-  },
-  "scripts": {
-    "build": "npm install chomp ; chomp build",
-    "test": "npm install chomp ; chomp test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/keller-mark/dynamic-importmap.git"
-  },
-  "bugs": {
-    "url": "https://github.com/keller-mark/dynamic-importmap/issues"
-  },
-  "homepage": "https://github.com/keller-mark/dynamic-importmap#readme",
-  "dependencies": {
-    "chomp": "^0.2.13"
+    "terser": "^5.10.0",
+    "cypress": "^10.10.0",
+    "http-server": "^14.0.0"
   }
 }
