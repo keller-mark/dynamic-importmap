@@ -58,11 +58,11 @@ However, this depends on a specialized CDN and prevents potentially hosting the 
 
 Another solution would be to create a bundle for `some-b` which _contains_ a copy of `some-a`.
 However, this must be done at build time and published to NPM as a third joint package.
-This also requires fixing the version of `some-a` that included at build time, and would prevent usage of a different version or variant (e.g., for production vs. development).
+This also requires fixing the version of `some-a` that is included at build time, and would prevent usage of a different version or variant (e.g., for production vs. development).
 
 ### Pre-rewriting solution
 
-A different solution might be to rewrite the bare import specifiers into full specifiers at build time (potentially in some new package `some-b-with-full-import-specifiers-for-a`).
+A different solution might be to rewrite the bare import specifiers into full specifiers at build time.
 However, this couples the package to a particular CDN, which makes redundancy difficult and may have security implications.
 Similar to the above pre-bundling solution, it also locks in the version/variant of `some-a` that is used (i.e., in the full specifier).
 
