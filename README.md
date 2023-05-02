@@ -104,7 +104,7 @@ const { B_DependsOnA } = await importShim('some-b-with-bare-import-specifiers-fo
 
 </details>
 
-However, this usage of `es-module-shims` is not well documented, involves some undesired use of side-effects and global variables, and involves importing unused code (i.e., the feature detection and error handling code necessary for its polyfill-mode).
+However, this usage of `es-module-shims` involves some undesired use of side-effects and global variables, and involves importing unused code (i.e., the feature detection and error handling code necessary for its polyfill-mode).
 
 `dynamic-importmap` simply re-packages much of the `es-module-shims` internals into a straightforward one-function API that does not include the polyfill-related code.
 
