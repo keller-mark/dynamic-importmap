@@ -166,4 +166,5 @@ For example, such a React component library might need to be imported into an ES
 
 - https://html.spec.whatwg.org/multipage/webappapis.html#import-maps
 - https://github.com/WICG/import-maps
+- https://github.com/WICG/import-maps/issues/92
 - https://github.com/guybedford/es-module-shims
