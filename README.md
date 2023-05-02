@@ -29,12 +29,7 @@ While it is ideal, the luxury of having full control over the application is not
 </script>
 ```
 
-## Solutions
-
 ### `dynamic-importmap` solution
-
-Note that `dynamic-importmap` is meant to be a last resort (e.g., after considering the alternatives listed below).
-As noted by the WICG (quoted above), import maps should ideally be defined at the application level using `<script type="importmap"/>` to ensure that common modules can be shared.
 
 ```html
 <script type="module">
@@ -53,6 +48,11 @@ As noted by the WICG (quoted above), import maps should ideally be defined at th
   // It works!
 </script>
 ```
+
+Note that `dynamic-importmap` is meant to be a last resort (e.g., after considering the alternative solutions below).
+As noted by the WICG (quoted above), import maps should ideally be defined at the application level using `<script type="importmap"/>` to ensure that common modules can be shared.
+
+## Alternative solutions
 
 ### ESM-aware CDN solution
 
@@ -122,7 +122,7 @@ Just kidding :laughing:
 
 A common practice is to publish a React component library to NPM as ESM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
 Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
-For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget).
+For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget) or an R [htmlwidget](https://www.htmlwidgets.org/develop_intro.html#javascript-binding).
 
 ```html
 <div id="root"></div>
