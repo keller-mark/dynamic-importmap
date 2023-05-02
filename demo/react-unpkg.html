@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test</title>
+  </head>
+  <body>
+    <h2>Demo inside a plain HTML page</h2>
+
+    <div id="root"></div>
+    <script type="module">
+      import { importWithMap } from 'https://unpkg.com/dynamic-importmap@0.0.1';
+
+      const importMap = {
+        imports: {
+          "react": "https://esm.sh/react@18.2.0?dev",
+          "react-dom": "https://esm.sh/react-dom@18.2.0?dev",
+          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev",
+          "prop-types": "https://esm.sh/prop-types@15.8.1?dev",
+          "react-feather": "https://unpkg.com/react-feather@2.0.10/dist/index.js"
+        },
+      };
+
+      const React = await importWithMap("react", importMap);
+      const { createRoot } = await importWithMap("react-dom/client", importMap);
+
+      // react-feather is a React icon library
+      // which contains bare import specifiers for "react" and "prop-types"
+      const { Smile } = await importWithMap('react-feather', importMap);
+
+      function MyApp(props) {
+        return React.createElement(React.Suspense,
+          { fallback: React.createElement('div', {}, 'Loading...') },
+          React.createElement(Smile),
+        );
+      }
+
+      const domContainer = document.getElementById('root');
+      const root = createRoot(domContainer);
+      root.render(React.createElement(MyApp));
+    </script>
+  </body>
+</html>

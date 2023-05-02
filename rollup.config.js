@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import replace from '@rollup/plugin-replace';
+import terser from '@rollup/plugin-terser';
 
 const version = JSON.parse(fs.readFileSync('package.json')).version;
 
@@ -30,6 +31,9 @@ function config (isWasm, isDebug) {
         'self.ESMS_DEBUG': isDebug.toString(),
         preventAssignment: true
       }),
+      ...(!isWasm && !isDebug ? [
+        terser()
+      ] : []),
     ]
   };
 }
