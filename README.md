@@ -1,6 +1,6 @@
 # dynamic-importmap
 
-![npm](https://img.shields.io/npm/v/dynamic-importmap)
+[![npm](https://img.shields.io/npm/v/dynamic-importmap)](https://www.npmjs.com/package/dynamic-importmap)
 
 ## Motivation
 
