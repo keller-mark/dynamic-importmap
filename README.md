@@ -123,7 +123,7 @@ Just kidding :laughing:
 
 A common practice is to publish a React component library to NPM as ESM in which `react` and `react-dom` have been "externalized" and kept as bare import specifiers.
 Using `dynamic-importmap`, this component library can be dynamically imported from a regular CDN (e.g., [unpkg](https://unpkg.com/)), without having full control over the importmaps on the page.
-For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget) or an R [htmlwidget](https://www.htmlwidgets.org/develop_intro.html#javascript-binding).
+For example, such a React component library might need to be imported into an ES module that will run in a Jupyter notebook with [anywidget](https://github.com/manzt/anywidget), an R [htmlwidget](https://www.htmlwidgets.org/develop_intro.html#javascript-binding), or an [Observable notebook cell](https://observablehq.com/@keller-mark/dynamic-importmap-demo).
 
 ```html
 <div id="root"></div>
