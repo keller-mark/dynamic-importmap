@@ -428,6 +428,8 @@ function metaResolve (id, parentUrl = this.url) {
   return resolveSync(id, parentUrl);
 }
 
+self.importShim = importShim; // For the import.meta and dynamic import cases.
+
 const registry = importShim._r = {};
 
 async function loadAll (load, seen) {
