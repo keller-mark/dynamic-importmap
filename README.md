@@ -35,7 +35,7 @@ While it is ideal, the luxury of having full control over the application is not
 
 ```html
 <script type="module">
-  import { importWithMap } from 'https://unpkg.com/dynamic-importmap@0.0.1';
+  import { importWithMap } from 'https://unpkg.com/dynamic-importmap@0.1.0';
 
   const importMap = {
     imports: {
@@ -130,7 +130,7 @@ For example, such a React component library might need to be imported into an ES
 ```html
 <div id="root"></div>
 <script type="module">
-  import { importWithMap } from 'https://unpkg.com/dynamic-importmap@0.0.1';
+  import { importWithMap } from 'https://unpkg.com/dynamic-importmap@0.1.0';
 
   const importMap = {
     imports: {
