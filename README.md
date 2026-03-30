@@ -2,6 +2,10 @@
 
 [![npm](https://img.shields.io/npm/v/dynamic-importmap)](https://www.npmjs.com/package/dynamic-importmap)
 
+
+A variant of this is now being used by [WordPress](https://github.com/WordPress/gutenberg/blob/ad3345694754dbfe619eaa0c10d129ecd25c31a5/packages/interactivity-router/src/assets/dynamic-importmap/index.ts#L4) 🥳.
+
+
 ## Motivation
 
 > Import maps are currently disallowed once any module loading has started, or once a single import map is loaded.
